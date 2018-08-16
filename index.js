@@ -16,7 +16,7 @@
  * @returns {Promise}
  */
 
-function paginate(query, options, callback) {
+async function paginate(query, options, callback) {
   query = query || {};
   options = Object.assign({}, paginate.options, options);
   let select = options.select;
@@ -25,7 +25,7 @@ function paginate(query, options, callback) {
   let lean = options.lean || false;
   let leanWithId = options.leanWithId ? options.leanWithId : true;
   let limit = options.limit ? options.limit : 10;
-  let page, offset, skip, promises;
+  let page, offset, skip, data;
   if (options.offset) {
     offset = options.offset;
     skip = offset;
@@ -49,40 +49,44 @@ function paginate(query, options, callback) {
         docsQuery.populate(item);
       });
     }
-    promises = {
-      docs: docsQuery.exec(),
-      count: this.estimatedDocumentCount(query).exec()
+    data = {
+      docs: await docsQuery.exec(),
+      count: await this.count(query).exec()
     };
-    if (lean && leanWithId) {
-      promises.docs = promises.docs.then((docs) => {
-        docs.forEach((doc) => {
-          doc.id = String(doc._id);
-        });
-        return docs;
-      });
+    if (lean) {
+      if (leanWithId) {
+        data.docs = data.docs.map(doc => { 
+          doc.id = String(doc._id) 
+          return doc
+        })
+      } else if (leanWithId === false) {
+        let _docs = data.docs.map(doc => { 
+          delete doc.id
+          return doc
+        })
+        data.docs = _docs
+      } else {
+        data.docs
+      }
     }
+
+  let result = {
+    docs: data.docs,
+    total: data.count,
+    limit: limit
   }
-  promises = Object.keys(promises).map((x) => promises[x]);
-  return Promise.all(promises).then((data) => {
-    let result = {
-      docs: data.docs,
-      total: data.count,
-      limit: limit
-    };
-    if (offset !== undefined) {
-      result.offset = offset;
-    }
-    if (page !== undefined) {
-      result.page = page;
-      result.pages = Math.ceil(data.count / limit) || 1;
-    }
-    if (typeof callback === 'function') {
-      return callback(null, result);
-    }
-    let promise = new Promise();
-    promise.resolve(result);
-    return promise;
-  });
+  if (offset !== undefined) {
+    result.offset = offset;
+  }
+  if (page !== undefined) {
+    result.page = page;
+    result.pages = Math.ceil(data.count / limit) || 1;
+  }
+  if (typeof callback === 'function') {
+    return callback(null, result);
+  }
+    return result
+  }
 }
 
 /**

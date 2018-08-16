@@ -143,7 +143,7 @@ describe('mongoose-paginate', function() {
     });
     describe('with lean', function() {
       it('with default leanWithId=true', function() {
-        return Book.paginate({}, { lean: true }).then(function(result) {
+        return Book.paginate({}, { lean: true, leanWithId: true }).then(function(result) {
           expect(result.docs[0]).to.not.be.an.instanceof(mongoose.Document);
           expect(result.docs[0].id).to.equal(String(result.docs[0]._id));
         });
